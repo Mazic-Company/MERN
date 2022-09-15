@@ -1,0 +1,55 @@
+<!-- </div>
+<footer>
+    <h1>Footer</h1>
+</footer> -->
+</body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.2/socket.io.js" ></script>
+<script>
+
+document.getElementById("current_date").innerHTML = Date();
+    
+const socket = io("http://127.0.0.1:3000");
+
+
+socket.on('AirTemp1', (data)=>{
+//console.log("event recieved"+data);
+// console.log("data recieved from js file")
+document.getElementById('temp').innerHTML = `${data} °C` ;
+}) 
+
+socket.on('AirHumi1', (data)=>{
+//console.log("event recieved"+data);
+// console.log("data recieved from js file")
+document.getElementById('hum').innerHTML = `${data} %` ;
+}) 
+
+
+// socket.on('SolHumiV1', (data)=>{
+// //console.log("event recieved"+data);
+// // console.log("data recieved from js file")
+// document.getElementById('HV1').innerHTML = `${data}` ;
+// }) 
+
+
+socket.on('SolHumiP1', (data)=>{
+console.log("event recieved"+data);
+// console.log("data recieved from js file")
+document.getElementById('HP1').innerHTML = `${data} %` ;
+}) 
+// socket.on('Date', (data)=>{
+// //console.log("event recieved"+data);
+// // console.log("data recieved from js file")
+// document.getElementById('Date').innerHTML = `${data}` ;
+// }) 
+// socket.on('Time', (data)=>{
+// //console.log("event recieved"+data);
+// // console.log("data recieved from js file")
+// document.getElementById('Time').innerHTML = `${data}` ;
+// }) 
+// socket.on('arduino', (data)=>{
+// console.log("event recieved asidi"+data);
+// // console.log("data recieved from js file")
+// document.getElementById('arduino').innerHTML = `${data}` ;
+// }) 
+</script>
+</html>

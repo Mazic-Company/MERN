@@ -3,7 +3,10 @@ var express = require('express');
 var mongodb = require('mongodb');
 var mongoose = require('mongoose');
 var MongoClient = require('mongodb').MongoClient;
-var url = "mongodb://localhost:27017/";
+var x = 0;
+//mongodb://localhost:27017
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+var url = "mongodb://127.0.0.1:27017/";
 var path = require('path')
 var routes = require('./routes')
 var router = express.Router();
@@ -13,6 +16,18 @@ var server = http.createServer(app);
 var io = require("socket.io")(server, {cors:{
     origin: "*"}
   });
+
+
+var string
+var temperature
+var  humidite 
+var humiSP1
+var  humiditeSPourcent1
+var  humiditeS1
+var dbo
+
+
+
 app.set("port", process.env.PORT || 3000)
 app.set("views",path.join(__dirname,"views"))
 app.use(express.static(__dirname));
@@ -21,6 +36,8 @@ const { Schema } = mongoose;
 const slaveSchema = new Schema({
     Temperature: { type: Number,required: true }, // String is shorthand for {type: String}
     Humidity: { type: Number, required: true },
+    date: { type: Date,
+           default: Date.now, required: true },
     s1: { humidity1:{ type: Number, required: true },
       temperature1:{ type: Number, required: true },
       HumSV1:{ type: Number, required: true },
@@ -31,18 +48,30 @@ const slaveSchema = new Schema({
       temperature2:{ type: Number, required: true },
       HumSV2:{ type: Number, required: true },
       HumSP2:{ type: Number, required: true },
-    date: { type: Date,
-           default: Date.now, required: true },
     Date: { type: String, required: true },
     Heur: { type: String, required: true }
     }
   });
-const slave = mongoose.model('slave', slaveSchema);
+  const slave = mongoose.model('slave', slaveSchema);
+  const recieverSchema = new Schema({
+    RecieverNumber: { type: Number,required: true }, // String is shorthand for {type: String}
+    State: { type: String, required: true },
+    date: { type: Date,
+           default: Date.now, required: true },
+    Date: { type: String, required: true },
+    Heur: { type: String, required: true }
+    
+  });
+const reciever = mongoose.model('reciever', recieverSchema);
 
 var heureInsertion;
 var heureEtDate;
 var dateHier;
-
+var sec;
+var recieved;
+var tempe 
+var humi
+var humiS1
 const Time = () =>{
     datHeure = new Date();
     min = datHeure.getMinutes();
@@ -58,37 +87,74 @@ if (min < 10) { min = '0' + min; }
 if (heur < 10) { heur = '0' + heur; }
     heureInsertion = heur + ':' + min + ':' + sec;
     heureEtDate = mois + '/' + numMois + '/' + laDate;
-dateHier = (mois-1) + '/' + numMois + '/' + laDate;
-
+    dateHier = (mois-1) + '/' + numMois + '/' + laDate;
+//console.log(heureInsertion)
 };
 
-
-
-
-const serialPort = new SerialPort({path: "/dev/ttyACM0", baudRate: 9600});
+const serialPort = new SerialPort({path: "/dev/ttyUSB0", baudRate: 9600});
 const {StringStream} = require('scramjet');
-
-
 serialPort.on('Serial Port open', () => console.log('open'));
-
 var brightness = 'L';
-
-function sendData() {
+ async function sendData() {
      // the brightness to send for the LED
-  console.log('port open');
+     
+     
+     Time();
+     if(sec == "00")
+     {
+      
+     if(humiSP1 <= 36){
+      x=1;
+    console.log('port open');
     // convert the value to an ASCII string before sending it:
+    signal='Start Pump'
+    console.log('Sending ' + signal + ' out the serial port');
+    serialPort.write(signal.toString());
+    var Reciever = new reciever();
+    Reciever.RecieverNumber = 1;
+    Reciever.State = "on";
+    Reciever.Date=heureEtDate;
+    Reciever.Heur = heureInsertion;    
+    MongoClient.connect(url, { useUnifiedTopology: true },function(err, db) {
+                    if (err) throw err;
+                    console.log("db connected");
+                    dbo = db.db("dhtTemp");
     
+                dbo.collection("Reciever").insertOne(Reciever, function(err, res) {
+                    if (err) throw err;
+                    console.log("1 document inserted\n\n");
+                    db.close();
+                });
+             
+    }); 
+    console.log("I'm going to sleep for 10 second.");
+  await sleep(10000);
+  console.log('I woke up after 10 second.');
+  signal='Stop Pump'
+    console.log('Sending ' + signal + ' out the serial port');
+    serialPort.write(signal.toString());
+    var Reciever = new reciever();
+    Reciever.RecieverNumber = 1;
+    Reciever.State = "off";
+    Reciever.Date=heureEtDate;
+    Reciever.Heur = heureInsertion;    
+    MongoClient.connect(url, { useUnifiedTopology: true },function(err, db) {
+                    if (err) throw err;
+                    console.log("db connected");
+                    dbo = db.db("dhtTemp");
     
-  if(brightness=="L")
-  {
-    brightness='H'
-  }
-  console.log('Sending ' + brightness + ' out the serial port');
-  serialPort.write(brightness.toString());
-    
+                dbo.collection("Reciever").insertOne(Reciever, function(err, res) {
+                    if (err) throw err;
+                    console.log("1 document inserted\n\n");
+                    db.close();
+                });
+             
+    });
+  x=0
 }
+} 
+} 
 
-var recieved;
 serialPort.pipe(new StringStream) // pipe the stream to scramjet StringStream
     .lines('\n')                  // split per line
     .each(                        // send message per every line
@@ -98,37 +164,29 @@ serialPort.pipe(new StringStream) // pipe the stream to scramjet StringStream
         
         
     //*decoupe des donnees venant de la carte Arduino
-    var string = recieved.split("*");
+    string = recieved.split("*");
     //!
     //io.emit('temp', string);
-    var temperature = string[0]; //*decoupe de la temperature
+    temperature = string[0]; //*decoupe de la temperature
     
-    var  humidite = string[1]; //*decoupe de l'humidite
-    var  humiditeSPourcent1 = string[2];
-    var  humiditeS1 = string[3];
+    humidite = string[1]; //*decoupe de l'humidite
+    humiditeSPourcent1 = string[2];
+    humiditeS1 = string[3];
+
     //var  humiditeSPourcent2 = string[4];
     //var  humiditeS2 = string[5];
     
-    var tempe = parseFloat(temperature);
+    tempe = parseFloat(temperature);
     io.emit('AirTemp1',tempe)
-    var humi = parseFloat(humidite);
+    humi = parseFloat(humidite);
     io.emit('AirHumi1',humi)
-    var humiS1 = parseFloat(humiditeS1);
+    humiS1 = parseFloat(humiditeS1);
     //io.emit('SolHumiV1',humiS1)
-    var humiSP1 = parseFloat(humiditeSPourcent1);
+    humiSP1 = parseFloat(humiditeSPourcent1);
     io.emit('SolHumiP1',humiSP1)
     //var humiS2 = parseFloat(humiditeS2);
     //var humiSP2 = parseFloat(humiditeSPourcent2);
 
-    if(humiSP1>26||humiSP1>=26){
-      sendData()
-    }else
-    {
-      brightness='L'
-      serialPort.write(brightness.toString());
-      console.log('Sending ' + brightness + ' out the serial port');
-    }
-    
     Time();
     //io.emit('Date',heureEtDate);
     //io.emit('Time',heureInsertion);
@@ -155,16 +213,13 @@ serialPort.pipe(new StringStream) // pipe the stream to scramjet StringStream
     Slave.s2.HumSV2 = humiS1;
     Slave.s2.HumSP2 = humiSP1;
     Slave.Date=heureEtDate;
-    Slave.Heur = heureInsertion;
-
-    console.log("1 document inserted\n\n");
-    
+    Slave.Heur = heureInsertion;    
     MongoClient.connect(url, { useUnifiedTopology: true },function(err, db) {
                     if (err) throw err;
                     console.log("db connected");
-                    var dbo = db.db("dhtTemp");
+                    dbo = db.db("dhtTemp");
     
-                dbo.collection("tempHum").insertOne(Slave, function(err, res) {
+                dbo.collection("sender").insertOne(Slave, function(err, res) {
                     if (err) throw err;
                     console.log("1 document inserted\n\n");
                     db.close();
@@ -175,9 +230,11 @@ serialPort.pipe(new StringStream) // pipe the stream to scramjet StringStream
     }
     
     );
-
+    
+ 
 io.on('connection',(socket)=>
-    {   console.log("connection ") });
+    {   
+    console.log("connection ") });
     app.use(routes)
     app.get('/index', (req, res) => {
         
@@ -197,12 +254,16 @@ io.on('connection',(socket)=>
     //     res.sendFile(__dirname + '/js.js');
     // });
     
-
     server.listen(app.get("port"),function(){    
-        console.log("Server Started on port "+ app.get("port"))        
+        console.log("Server Started on port "+ app.get("port"))      
+       
     })
 
-
-
+ if(x==0)
+ {
+  setInterval(sendData, 1000);
+  
+ }
+   
 
 

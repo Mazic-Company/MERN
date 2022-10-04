@@ -4,12 +4,12 @@
 </footer> -->
 </body>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.2/socket.io.js" ></script>
-<script>
+
+<script >
 
 document.getElementById("current_date").innerHTML = Date();
-    
-const socket = io("http://127.0.0.1:3000");
 
+const socket = io("http://192.168.0.110:3000");
 
 socket.on('AirTemp1', (data)=>{
 //console.log("event recieved"+data);
